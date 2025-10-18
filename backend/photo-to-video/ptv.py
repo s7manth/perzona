@@ -28,9 +28,20 @@ def download_hallo3_models():
 image = (
     modal.Image
     .from_registry("nvidia/cuda:12.1.1-devel-ubuntu20.04", add_python="3.10")
-    .env({"DEBIAN_FRONTEND": "noninteractive"})
-    .apt_install("git", "ffmpeg", "clang", "libaio-dev")
-    .pip_install_from_pyproject("pyproject.toml")
+    .pip_install_from_pyproject("photo-to-video/pyproject.toml")
+    .env({
+        "DEBIAN_FRONTEND": "noninteractive",
+        "CC": "gcc",
+        "CXX": "g++",
+        "CUDA_HOME": "/usr/local/cuda",
+        "PATH": "/usr/local/cuda/bin:$PATH",
+        "CFLAGS": "-O2",
+        "CXXFLAGS": "-O2"
+    })
+    .apt_install("git", "ffmpeg", "libaio-dev", "libgl1-mesa-glx", "libglib2.0-0", "libsm6", "libxext6", "libxrender-dev", "libgomp1", "python3-dev", "build-essential", "g++", "make", "cmake")
+    .run_commands("pip install numpy cython setuptools wheel")
+    .run_commands("pip install insightface==0.7.3")
+    .run_commands("pip install onnxruntime-gpu")
     .run_commands("git clone https://github.com/fudan-generative-vision/hallo3 /hallo3")
     .run_commands("ln -s /models/pretrained_models /hallo3/pretrained_models")
     .run_function(download_hallo3_models, volumes=volumes)
@@ -71,10 +82,20 @@ class PortraitAvatarServer:
             photo_path = f"/s3-mount/{request.photo_s3_key}"
             audio_path = f"/s3-mount/{request.audio_s3_key}"
 
+            print(f"Checking photo path: {photo_path}")
+            print(f"Checking audio path: {audio_path}")
+            
             if not os.path.exists(photo_path):
+                print(f"Photo file not found at {photo_path}")
+                print(f"S3 mount directory contents: {os.listdir('/s3-mount') if os.path.exists('/s3-mount') else 'S3 mount not found'}")
                 raise FileNotFoundError(f"Photo not found at {photo_path}")
             if not os.path.exists(audio_path):
-                raise FileNotFoundError(f"Photo not found at {audio_path}")
+                print(f"Audio file not found at {audio_path}")
+                print(f"S3 mount directory contents: {os.listdir('/s3-mount') if os.path.exists('/s3-mount') else 'S3 mount not found'}")
+                raise FileNotFoundError(f"Audio not found at {audio_path}")
+                
+            print(f"Photo file size: {os.path.getsize(photo_path)} bytes")
+            print(f"Audio file size: {os.path.getsize(audio_path)} bytes")
 
             input_txt_path = os.path.join(temp_dir, "input.txt")
             with open(input_txt_path, "w") as f:
@@ -91,15 +112,55 @@ class PortraitAvatarServer:
                 output_dir
             ]
 
-            subprocess.run(command, check=True, cwd="/hallo3")
+            print(f"Running command: {' '.join(command)}")
+            print(f"Working directory: /hallo3")
+            print(f"Input file exists: {os.path.exists(input_txt_path)}")
+            print(f"Input file content: {open(input_txt_path, 'r').read()}")
+            
+            try:
+                result = subprocess.run(command, check=True, cwd="/hallo3", 
+                                      capture_output=True, text=True, timeout=2700)
+                print(f"Command stdout: {result.stdout}")
+                print(f"Command stderr: {result.stderr}")
+            except subprocess.TimeoutExpired:
+                print("Command timed out after 5 minutes")
+                raise RuntimeError("Hallo3 inference timed out")
+            except subprocess.CalledProcessError as e:
+                print(f"Command failed with return code {e.returncode}")
+                print(f"stdout: {e.stdout}")
+                print(f"stderr: {e.stderr}")
+                raise RuntimeError(f"Hallo3 inference failed: {e.stderr}")
+            
             print("Processing finished")
+            print(f"Output directory contents: {os.listdir(output_dir)}")
+            
+            # Check for any video files in the output directory
+            all_files = []
+            for root, dirs, files in os.walk(output_dir):
+                for file in files:
+                    all_files.append(os.path.join(root, file))
+            print(f"All files in output directory: {all_files}")
 
             generated_video_file = None
             for fpath in glob.glob(os.path.join(output_dir, "**", "*.mp4"), recursive=True):
                 generated_video_file = fpath
+                print(f"Found video file: {fpath}")
                 break
+                
             if not generated_video_file:
-                raise RuntimeError("Hallo3 did not produce a video file.")
+                # Try to find any video file with different extensions
+                for ext in ["*.avi", "*.mov", "*.mkv", "*.webm"]:
+                    for fpath in glob.glob(os.path.join(output_dir, "**", ext), recursive=True):
+                        generated_video_file = fpath
+                        print(f"Found video file with extension {ext}: {fpath}")
+                        break
+                    if generated_video_file:
+                        break
+                        
+            if not generated_video_file:
+                error_msg = f"Hallo3 did not produce a video file. Output directory contents: {os.listdir(output_dir)}"
+                print(error_msg)
+                raise RuntimeError(error_msg)
 
             print("Merging the video and audio with ffmpeg.")
             final_video_path = os.path.join(temp_dir, "final_video.mp4")

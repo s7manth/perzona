@@ -15,7 +15,7 @@ app = modal.App("chatterbox-tts-generator")
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install("numpy>=1.21.0")
-    .pip_install_from_pyproject("pyproject.toml")
+    .pip_install_from_pyproject("text-to-speech/pyproject.toml")
     .apt_install("ffmpeg")
 )
 
