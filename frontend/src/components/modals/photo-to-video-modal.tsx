@@ -37,15 +37,15 @@ import {
   const samplePhotos = [
     {
       s3Key: "samples/photos/0008.jpg",
-      url: "https://perzona-bucket.s3.eu-west-3.amazonaws.com/samples/photos/0008.jpg",
+      url: "https://public-perzona-bucket.s3.eu-west-3.amazonaws.com/samples/photos/0008.jpg",
     },
     {
       s3Key: "samples/photos/0009.jpg",
-      url: "https://perzona-bucket.s3.eu-west-3.amazonaws.com/samples/photos/0009.jpg",
+      url: "https://public-perzona-bucket.s3.eu-west-3.amazonaws.com/samples/photos/0009.jpg",
     },
     {
       s3Key: "samples/photos/0022.jpg",
-      url: "https://perzona-bucket.s3.eu-west-3.amazonaws.com/samples/photos/0022.jpg",
+      url: "https://public-perzona-bucket.s3.eu-west-3.amazonaws.com/samples/photos/0022.jpg",
     },
   ];
   
