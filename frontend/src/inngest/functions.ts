@@ -4,10 +4,18 @@ import { env } from "~/env";
 import { getPresignedUrl } from "~/lib/s3";
 import { fal } from "@fal-ai/client";
 
-// Configure FAL client
+// Configure FAL client with fallback
+const falKey = env.FAL_KEY || process.env.FAL_KEY;
+if (!falKey) {
+  throw new Error("FAL_KEY environment variable is not set");
+}
+
 fal.config({
-  credentials: env.FAL_KEY,
+  credentials: falKey,
 });
+
+// Debug: Log FAL_KEY status
+console.log("FAL_KEY configured:", falKey ? "SET" : "NOT SET");
 
 export const photoToVideo = inngest.createFunction(
   {
