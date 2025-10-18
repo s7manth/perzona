@@ -24,7 +24,7 @@ const perzonaLibraryVoice: Voice[] = [
     flag: "🇺🇸",
     audioSrc:
       "https://perzona-bucket.s3.eu-west-3.amazonaws.com/samples/voices/2.wav",
-    s3Key: "samples/voices/bezos.wav",
+    s3Key: "samples/voices/2.wav",
   },
   {
     id: "v2",
@@ -33,8 +33,8 @@ const perzonaLibraryVoice: Voice[] = [
     accent: "American",
     flag: "🇺🇸",
     audioSrc:
-      "https://perzona-bucket.s3.eu-west-3.amazonaws.com/samples/voices/harris.wav",
-    s3Key: "samples/voices/harris.wav",
+      "https://perzona-bucket.s3.eu-west-3.amazonaws.com/samples/voices/3.wav",
+    s3Key: "samples/voices/3.wav",
   },
   {
     id: "v3",
@@ -43,8 +43,8 @@ const perzonaLibraryVoice: Voice[] = [
     accent: "American",
     flag: "🇺🇸",
     audioSrc:
-      "https://perzona-bucket.s3.eu-west-3.amazonaws.com/samples/voices/zuck.wav",
-    s3Key: "samples/voices/zuck.wav",
+      "https://perzona-bucket.s3.eu-west-3.amazonaws.com/samples/voices/4.wav",
+    s3Key: "samples/voices/4.wav",
   },
 ];
 
