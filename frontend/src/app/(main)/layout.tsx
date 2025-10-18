@@ -19,8 +19,8 @@ import { AppSidebar } from "~/components/sidebar/app-sidebar";
 import BreadcrumbPageClient from "~/components/sidebar/breadcrumb-client";
 
 export const metadata: Metadata = {
-  title: "Perzona",
-  description: "Perzona",
+  title: "HeyGen",
+  description: "HeyGen",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 

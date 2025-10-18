@@ -30,13 +30,6 @@ export async function AppSidebar() {
         <UserButton
           variant="outline"
           size="default"
-          additionalLinks={[
-            {
-              label: "Customer Portal",
-              href: "/customer-portal",
-              icon: <User />,
-            },
-          ]}
         />
       </SidebarFooter>
     </Sidebar>

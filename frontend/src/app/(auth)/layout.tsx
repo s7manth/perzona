@@ -6,8 +6,8 @@ import { Toaster } from "~/components/ui/sonner";
 import { Providers } from "~/components/providers";
 
 export const metadata: Metadata = {
-  title: "Perzona",
-  description: "Perzona",
+  title: "HeyGen",
+  description: "HeyGen",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
