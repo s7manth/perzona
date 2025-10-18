@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   let payload: FalWebhookPayload;
 
   try {
-    payload = await req.json();
+    payload = await req.json() as unknown as FalWebhookPayload;
     console.log("FAL Webhook payload:", JSON.stringify(payload, null, 2));
 
     const { request_id, status } = payload;
