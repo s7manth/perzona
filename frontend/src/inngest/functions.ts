@@ -124,6 +124,93 @@ export const photoToVideo = inngest.createFunction(
           },
         });
       });
+
+      // Poll FAL job status until completion
+      const result = await step.run("poll-fal-job-status", async () => {
+        let attempts = 0;
+        const maxAttempts = 60; // 5 minutes with 5-second intervals
+        const pollInterval = 5000; // 5 seconds
+
+        while (attempts < maxAttempts) {
+          try {
+            const status = await fal.queue.status("fal-ai/ai-avatar", {
+              requestId: request_id,
+              logs: true,
+            });
+
+            console.log(`FAL job ${request_id} status:`, status.status);
+
+            const statusString = String(status.status);
+            
+            if (statusString === "COMPLETED") {
+              // Get the result
+              const result = await fal.queue.result("fal-ai/ai-avatar", {
+                requestId: request_id,
+              });
+
+              if (result.data?.video?.url) {
+                console.log(`FAL job ${request_id} completed with video URL:`, result.data.video.url);
+                return {
+                  status: "completed",
+                  videoUrl: result.data.video.url,
+                };
+              } else {
+                throw new Error("No video URL in FAL result");
+              }
+            } else if (statusString === "FAILED" || statusString === "ERROR") {
+              throw new Error(`FAL job failed: ${statusString}`);
+            }
+
+            // Job is still in progress, wait and try again
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+            attempts++;
+          } catch (error) {
+            console.error(`Error checking FAL job status (attempt ${attempts + 1}):`, error);
+            if (attempts >= maxAttempts - 1) {
+              throw error;
+            }
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+            attempts++;
+          }
+        }
+
+        throw new Error(`FAL job ${request_id} timed out after ${maxAttempts} attempts`);
+      });
+
+      // Import video to S3 and update database
+      if (result.status === "completed" && result.videoUrl) {
+        const videoS3Key = await step.run("import-video-to-s3", async () => {
+          const res = await fetch(env.FILE_TO_S3_ENDPOINT, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Modal-Key": env.MODAL_KEY,
+              "Modal-Secret": env.MODAL_SECRET,
+            },
+            body: JSON.stringify({
+              video_url: result.videoUrl,
+            }),
+          });
+
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`FAL video import failed: ${text}`);
+          }
+
+          const data = (await res.json()) as { s3_key: string };
+          return data.s3_key;
+        });
+
+        await step.run("update-db-with-video", async () => {
+          return await db.photoToVideoGeneration.update({
+            where: { id: photoToVideo.id },
+            data: {
+              videoS3Key: videoS3Key,
+              status: "completed",
+            },
+          });
+        });
+      }
     } else {
       const videoResponse = await step.fetch(env.PHOTO_TO_VIDEO_ENDPOINT, {
         method: "POST",
@@ -241,6 +328,93 @@ export const translateVideo = inngest.createFunction(
         },
       });
     });
+
+    // Poll FAL job status until completion
+    const result = await step.run("poll-fal-job-status", async () => {
+      let attempts = 0;
+      const maxAttempts = 60; // 5 minutes with 5-second intervals
+      const pollInterval = 5000; // 5 seconds
+
+      while (attempts < maxAttempts) {
+        try {
+          const status = await fal.queue.status("fal-ai/dubbing", {
+            requestId: request_id,
+            logs: true,
+          });
+
+          console.log(`FAL job ${request_id} status:`, status.status);
+
+          const statusString = String(status.status);
+          
+          if (statusString === "COMPLETED") {
+            // Get the result
+            const result = await fal.queue.result("fal-ai/dubbing", {
+              requestId: request_id,
+            });
+
+            if (result.data?.video?.url) {
+              console.log(`FAL job ${request_id} completed with video URL:`, result.data.video.url);
+              return {
+                status: "completed",
+                videoUrl: result.data.video.url,
+              };
+            } else {
+              throw new Error("No video URL in FAL result");
+            }
+          } else if (statusString === "FAILED" || statusString === "ERROR") {
+            throw new Error(`FAL job failed: ${statusString}`);
+          }
+
+          // Job is still in progress, wait and try again
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          attempts++;
+        } catch (error) {
+          console.error(`Error checking FAL job status (attempt ${attempts + 1}):`, error);
+          if (attempts >= maxAttempts - 1) {
+            throw error;
+          }
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          attempts++;
+        }
+      }
+
+      throw new Error(`FAL job ${request_id} timed out after ${maxAttempts} attempts`);
+    });
+
+    // Import video to S3 and update database
+    if (result.status === "completed" && result.videoUrl) {
+      const videoS3Key = await step.run("import-video-to-s3", async () => {
+        const res = await fetch(env.FILE_TO_S3_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Modal-Key": env.MODAL_KEY,
+            "Modal-Secret": env.MODAL_SECRET,
+          },
+          body: JSON.stringify({
+            video_url: result.videoUrl,
+          }),
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`FAL video import failed: ${text}`);
+        }
+
+        const data = (await res.json()) as { s3_key: string };
+        return data.s3_key;
+      });
+
+      await step.run("update-db-with-video", async () => {
+        return await db.videoTranslationGeneration.update({
+          where: { id: videoTranslation.id },
+          data: {
+            videoS3Key: videoS3Key,
+            status: "completed",
+          },
+        });
+      });
+    }
   },
 );
 
@@ -328,5 +502,92 @@ export const changeVideoAudio = inngest.createFunction(
         },
       });
     });
+
+    // Poll FAL job status until completion
+    const result = await step.run("poll-fal-job-status", async () => {
+      let attempts = 0;
+      const maxAttempts = 60; // 5 minutes with 5-second intervals
+      const pollInterval = 5000; // 5 seconds
+
+      while (attempts < maxAttempts) {
+        try {
+          const status = await fal.queue.status("fal-ai/sync-lipsync", {
+            requestId: request_id,
+            logs: true,
+          });
+
+          console.log(`FAL job ${request_id} status:`, status.status);
+
+          const statusString = String(status.status);
+          
+          if (statusString === "COMPLETED") {
+            // Get the result
+            const result = await fal.queue.result("fal-ai/sync-lipsync", {
+              requestId: request_id,
+            });
+
+            if (result.data?.video?.url) {
+              console.log(`FAL job ${request_id} completed with video URL:`, result.data.video.url);
+              return {
+                status: "completed",
+                videoUrl: result.data.video.url,
+              };
+            } else {
+              throw new Error("No video URL in FAL result");
+            }
+          } else if (statusString === "FAILED" || statusString === "ERROR") {
+            throw new Error(`FAL job failed: ${statusString}`);
+          }
+
+          // Job is still in progress, wait and try again
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          attempts++;
+        } catch (error) {
+          console.error(`Error checking FAL job status (attempt ${attempts + 1}):`, error);
+          if (attempts >= maxAttempts - 1) {
+            throw error;
+          }
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          attempts++;
+        }
+      }
+
+      throw new Error(`FAL job ${request_id} timed out after ${maxAttempts} attempts`);
+    });
+
+    // Import video to S3 and update database
+    if (result.status === "completed" && result.videoUrl) {
+      const videoS3Key = await step.run("import-video-to-s3", async () => {
+        const res = await fetch(env.FILE_TO_S3_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Modal-Key": env.MODAL_KEY,
+            "Modal-Secret": env.MODAL_SECRET,
+          },
+          body: JSON.stringify({
+            video_url: result.videoUrl,
+          }),
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`FAL video import failed: ${text}`);
+        }
+
+        const data = (await res.json()) as { s3_key: string };
+        return data.s3_key;
+      });
+
+      await step.run("update-db-with-video", async () => {
+        return await db.changeVideoAudioGeneration.update({
+          where: { id: generation.id },
+          data: {
+            videoS3Key: videoS3Key,
+            status: "completed",
+          },
+        });
+      });
+    }
   },
 );
