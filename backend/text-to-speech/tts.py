@@ -14,7 +14,8 @@ app = modal.App("chatterbox-tts-generator")
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .pip_install_from_requirements("text-to-speech/requirements.txt")
+    .pip_install("numpy>=1.21.0")
+    .pip_install_from_pyproject("pyproject.toml")
     .apt_install("ffmpeg")
 )
 
@@ -49,7 +50,7 @@ class TextToSpeechServer:
         self.model = ChatterboxTTS.from_pretrained(device="cuda")
         print("Model loaded successfully")
 
-    @modal.fastapi_endpoint(method="POST", requires_proxy_auth=True)
+    @modal.fastapi_endpoint(method="POST")
     def generate_speech(self, request: TextToSpeechRequest) -> TextToSpeechResponse:
         print(f"Received request to generate speech for: {request.text}")
 
@@ -94,16 +95,18 @@ def main():
 
     request = TextToSpeechRequest(
         text="Hello from Modal! This is a test of Chatterbox!",
-        voice_S3_key="samples/voices/myvoice.wav"
+        voice_S3_key="samples/voices/1.wav"
     )
 
     payload = request.model_dump()
 
     headers = {
-        "Modal-Key": "wk-l1RbNAi2YXIzw4AqvNjHU5",
-        "Modal-Secret": "ws-3UxlJXh3IzFyB6gJLikGya"
+        "Modal-Key": "wk-yIWcTVBbpWqSss2VNv89Lu",
+        "Modal-Secret": "ws-1GVvYuGPUWcYYBEuY7WhuA"
     }
 
+
+    # Simple request without authentication for testing
     response = requests.post(endpoint_url, json=payload, headers=headers)
     response.raise_for_status()
 
