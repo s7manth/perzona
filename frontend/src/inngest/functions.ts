@@ -14,6 +14,21 @@ fal.config({
   credentials: falKey,
 });
 
+type FalPollResult = {
+  status: "completed";
+  videoUrl: string;
+};
+
+function extractFalVideoUrl(result: unknown): string | null {
+  if (typeof result !== "object" || result === null) return null;
+  const data = (result as { data?: unknown }).data;
+  if (typeof data !== "object" || data === null) return null;
+  const video = (data as { video?: unknown }).video;
+  if (typeof video !== "object" || video === null) return null;
+  const url = (video as { url?: unknown }).url;
+  return typeof url === "string" ? url : null;
+}
+
 // Debug: Log FAL_KEY status
 console.log("FAL_KEY configured:", falKey ? "SET" : "NOT SET");
 
@@ -24,7 +39,7 @@ export const photoToVideo = inngest.createFunction(
       limit: 5,
       key: "event.data.userId",
     },
-    onFailure: async ({ event, error }) => {
+    onFailure: async ({ event, error: _error }) => {
       await db.photoToVideoGeneration.update({
         where: {
           id: (event?.data?.event.data as { photoToVideoId: string })
@@ -126,56 +141,73 @@ export const photoToVideo = inngest.createFunction(
       });
 
       // Poll FAL job status until completion
-      const result = await step.run("poll-fal-job-status", async () => {
-        let attempts = 0;
-        const maxAttempts = 60; // 5 minutes with 5-second intervals
-        const pollInterval = 5000; // 5 seconds
+      const result = await step.run(
+        "poll-fal-job-status",
+        async (): Promise<FalPollResult> => {
+          let attempts = 0;
+          const maxAttempts = 60; // 5 minutes with 5-second intervals
+          const pollInterval = 5000; // 5 seconds
 
-        while (attempts < maxAttempts) {
-          try {
-            const status = await fal.queue.status("fal-ai/ai-avatar", {
-              requestId: request_id,
-              logs: true,
-            });
-
-            console.log(`FAL job ${request_id} status:`, status.status);
-
-            const statusString = String(status.status);
-            
-            if (statusString === "COMPLETED") {
-              // Get the result
-              const result = await fal.queue.result("fal-ai/ai-avatar", {
+          while (attempts < maxAttempts) {
+            try {
+              const status = await fal.queue.status("fal-ai/ai-avatar", {
                 requestId: request_id,
+                logs: true,
               });
 
-              if (result.data?.video?.url) {
-                console.log(`FAL job ${request_id} completed with video URL:`, result.data.video.url);
-                return {
-                  status: "completed",
-                  videoUrl: result.data.video.url,
-                };
-              } else {
+              console.log(`FAL job ${request_id} status:`, status.status);
+
+              const statusString = String(status.status);
+
+              if (statusString === "COMPLETED") {
+                // Get the result
+                const falResult: unknown = await fal.queue.result(
+                  "fal-ai/ai-avatar",
+                  {
+                    requestId: request_id,
+                  },
+                );
+                const videoUrl = extractFalVideoUrl(falResult);
+
+                if (videoUrl) {
+                  console.log(
+                    `FAL job ${request_id} completed with video URL:`,
+                    videoUrl,
+                  );
+                  return {
+                    status: "completed",
+                    videoUrl,
+                  };
+                }
+
                 throw new Error("No video URL in FAL result");
               }
-            } else if (statusString === "FAILED" || statusString === "ERROR") {
-              throw new Error(`FAL job failed: ${statusString}`);
-            }
 
-            // Job is still in progress, wait and try again
-            await new Promise(resolve => setTimeout(resolve, pollInterval));
-            attempts++;
-          } catch (error) {
-            console.error(`Error checking FAL job status (attempt ${attempts + 1}):`, error);
-            if (attempts >= maxAttempts - 1) {
-              throw error;
+              if (statusString === "FAILED" || statusString === "ERROR") {
+                throw new Error(`FAL job failed: ${statusString}`);
+              }
+
+              // Job is still in progress, wait and try again
+              await new Promise((resolve) => setTimeout(resolve, pollInterval));
+              attempts++;
+            } catch (error) {
+              console.error(
+                `Error checking FAL job status (attempt ${attempts + 1}):`,
+                error,
+              );
+              if (attempts >= maxAttempts - 1) {
+                throw error;
+              }
+              await new Promise((resolve) => setTimeout(resolve, pollInterval));
+              attempts++;
             }
-            await new Promise(resolve => setTimeout(resolve, pollInterval));
-            attempts++;
           }
-        }
 
-        throw new Error(`FAL job ${request_id} timed out after ${maxAttempts} attempts`);
-      });
+          throw new Error(
+            `FAL job ${request_id} timed out after ${maxAttempts} attempts`,
+          );
+        },
+      );
 
       // Import video to S3 and update database
       if (result.status === "completed" && result.videoUrl) {
@@ -249,7 +281,7 @@ export const translateVideo = inngest.createFunction(
       limit: 5,
       key: "event.data.userId",
     },
-    onFailure: async ({ event, error }) => {
+    onFailure: async ({ event, error: _error }) => {
       await db.videoTranslationGeneration.update({
         where: {
           id: (event?.data?.event.data as { videoTranslationId: string })
@@ -425,7 +457,7 @@ export const changeVideoAudio = inngest.createFunction(
       limit: 5,
       key: "event.data.userId",
     },
-    onFailure: async ({ event, error }) => {
+    onFailure: async ({ event, error: _error }) => {
       await db.changeVideoAudioGeneration.update({
         where: {
           id: (event?.data?.event.data as { changeVideoAudioId: string })

@@ -14,6 +14,7 @@ import {
     DialogHeader,
     DialogTitle,
   } from "~/components/ui/dialog";
+  import Image from "next/image";
   import { Input } from "~/components/ui/input";
   import { useRef, useState } from "react";
   import { Button } from "~/components/ui/button";
@@ -260,9 +261,13 @@ import {
                 ) : selectedPhotoUrl ? (
                   <div className="flex flex-col items-center justify-between gap-4">
                     <div className="relative">
-                      <img
+                      <Image
                         src={selectedPhotoUrl}
+                        alt="Selected photo preview"
                         crossOrigin="anonymous"
+                        width={340}
+                        height={340}
+                        unoptimized
                         className="max-h-[340px] max-w-full rounded-xl border object-contain md:max-w-[340px]"
                       />
                       <Button
@@ -300,16 +305,25 @@ import {
                       </div>
                       <div className="mt-1 flex gap-2">
                         {samplePhotos.map((item) => (
-                          <img
+                          <button
                             key={item.s3Key}
-                            crossOrigin="anonymous"
-                            className="h-14 w-14 cursor-pointer rounded border object-cover"
-                            src={item.url}
+                            type="button"
+                            className="cursor-pointer"
                             onClick={() => {
                               setSelectedPhotoUrl(item.url);
                               setSelectedPhotoFile(null);
                             }}
-                          />
+                          >
+                            <Image
+                              src={item.url}
+                              alt="Sample photo"
+                              crossOrigin="anonymous"
+                              width={56}
+                              height={56}
+                              unoptimized
+                              className="h-14 w-14 rounded border object-cover"
+                            />
+                          </button>
                         ))}
                       </div>
                     </div>

@@ -26,7 +26,7 @@ export function useAudioPlayer() {
       setPlayingSrc(null);
     } else {
       audio.src = src;
-      audio.play().catch((e) => console.error("Error playing audio"));
+      audio.play().catch(() => console.error("Error playing audio"));
       setPlayingSrc(src);
     }
   };
